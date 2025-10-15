@@ -43,20 +43,24 @@ feature_names = [
 st.sidebar.header("📂 Upload CSV Data (Optional)")
 uploaded_file = st.sidebar.file_uploader("Upload a CSV file containing feature data", type=["csv"])
 
-default_values = None
+default_values = []
 
 if uploaded_file is not None:
     try:
         data = pd.read_csv(uploaded_file)
-        # Check for required columns
         if all(col in data.columns for col in feature_names):
             random_row = data.sample(1, random_state=random.randint(0, 9999))
             default_values = random_row[feature_names].iloc[0].values
             st.sidebar.success("✅ CSV uploaded successfully. Random row loaded as default values.")
         else:
-            st.sidebar.error("❌ CSV missing required feature columns.")
+            st.sidebar.error("❌ CSV missing required feature columns. Random values will be used instead.")
+            default_values = np.random.uniform(0.5, 15.0, size=len(feature_names))
     except Exception as e:
-        st.sidebar.error(f"Error reading CSV: {e}")
+        st.sidebar.error(f"Error reading CSV: {e}. Random values will be used instead.")
+        default_values = np.random.uniform(0.5, 15.0, size=len(feature_names))
+else:
+    # Generate random values if no CSV uploaded
+    default_values = np.random.uniform(0.5, 15.0, size=len(feature_names))
 
 # --------------------------
 # Input fields for prediction
@@ -66,8 +70,7 @@ cols = st.columns(3)
 inputs = []
 
 for i, feature in enumerate(feature_names):
-    # Set default value to random row value if available
-    default_value = float(default_values[i]) if default_values is not None else 0.0
+    default_value = float(default_values[i])
     with cols[i % 3]:
         value = st.number_input(f"{feature.replace('_', ' ').title()}", value=default_value, format="%.5f", key=f"input_{i}")
         inputs.append(value)
@@ -80,7 +83,7 @@ if st.button("🔍 Predict"):
         input_data = np.array(inputs).reshape(1, -1)
         prediction = model.predict(input_data)[0]
 
-        # If model supports predict_proba, show confidence
+        # Show confidence if supported
         confidence = None
         if hasattr(model, "predict_proba"):
             prob = model.predict_proba(input_data)[0]
