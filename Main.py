@@ -1,6 +1,8 @@
 import streamlit as st
 import numpy as np
+import pandas as pd
 import pickle
+import random
 
 # --------------------------
 # Load the trained model
@@ -21,10 +23,8 @@ based on input features computed from a digitized image of a fine needle aspirat
 """)
 
 # --------------------------
-# Input fields
+# Feature names
 # --------------------------
-st.header("🔢 Enter the following features")
-
 feature_names = [
     'radius_mean', 'texture_mean', 'perimeter_mean', 'area_mean',
     'smoothness_mean', 'compactness_mean', 'concavity_mean',
@@ -37,25 +37,63 @@ feature_names = [
     'symmetry_worst', 'fractal_dimension_worst'
 ]
 
-# Create input fields (grouped for readability)
+# --------------------------
+# CSV Upload Section
+# --------------------------
+st.sidebar.header("📂 Upload CSV Data (Optional)")
+uploaded_file = st.sidebar.file_uploader("Upload a CSV file containing feature data", type=["csv"])
+
+default_values = None
+
+if uploaded_file is not None:
+    try:
+        data = pd.read_csv(uploaded_file)
+        # Check if all required columns are present
+        if all(col in data.columns for col in feature_names):
+            random_row = data.sample(1, random_state=random.randint(0, 9999))
+            default_values = random_row[feature_names].iloc[0].values
+            st.sidebar.success("✅ CSV uploaded successfully. Random row loaded as defaults.")
+        else:
+            st.sidebar.error("❌ Uploaded CSV does not contain all required feature columns.")
+    except Exception as e:
+        st.sidebar.error(f"Error reading file: {e}")
+
+# --------------------------
+# Input fields
+# --------------------------
+st.header("🔢 Enter or adjust the following features")
+
 cols = st.columns(3)
 inputs = []
+
 for i, feature in enumerate(feature_names):
     with cols[i % 3]:
-        value = st.number_input(f"{feature.replace('_', ' ').title()}", value=0.0, format="%.5f")
+        default_value = float(default_values[i]) if default_values is not None else 0.0
+        value = st.number_input(f"{feature.replace('_', ' ').title()}", value=default_value, format="%.5f")
         inputs.append(value)
 
 # --------------------------
-# Predict button
+# Prediction
 # --------------------------
 if st.button("🔍 Predict"):
     try:
         input_data = np.array(inputs).reshape(1, -1)
         prediction = model.predict(input_data)[0]
+
+        # If model supports predict_proba, show confidence
+        if hasattr(model, "predict_proba"):
+            prob = model.predict_proba(input_data)[0]
+            confidence = np.max(prob) * 100
+        else:
+            confidence = None
+
         result = "Malignant" if prediction == 1 else "Benign"
 
         st.subheader("🩺 Prediction Result")
         st.success(f"The tumor is predicted to be **{result}**.")
 
+        if confidence:
+            st.info(f"Model confidence: **{confidence:.2f}%**")
+
     except Exception as e:
-        st.error(f"An error occurred: {e}")
+        st.error(f"An error occurred during prediction: {e}")
