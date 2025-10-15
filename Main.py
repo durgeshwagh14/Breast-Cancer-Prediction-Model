@@ -7,7 +7,7 @@ import random
 # --------------------------
 # Load the trained model
 # --------------------------
-model_path = "best_model.pkl"  # Change if needed
+model_path = "best_model.pkl"
 with open(model_path, "rb") as file:
     model = pickle.load(file)
 
@@ -18,8 +18,8 @@ st.set_page_config(page_title="Breast Cancer Prediction", page_icon="🎗️", l
 
 st.title("🎗️ Breast Cancer Prediction App")
 st.markdown("""
-This app uses a trained machine learning model to predict whether a breast tumor is **Benign** or **Malignant** 
-based on input features computed from a digitized image of a fine needle aspirate (FNA) of a breast mass.
+This app predicts whether a breast tumor is **Benign** or **Malignant** 
+based on features from a digitized image of a fine needle aspirate (FNA) of a breast mass.
 """)
 
 # --------------------------
@@ -48,28 +48,28 @@ default_values = None
 if uploaded_file is not None:
     try:
         data = pd.read_csv(uploaded_file)
-        # Check if all required columns are present
+        # Check for required columns
         if all(col in data.columns for col in feature_names):
             random_row = data.sample(1, random_state=random.randint(0, 9999))
             default_values = random_row[feature_names].iloc[0].values
-            st.sidebar.success("✅ CSV uploaded successfully. Random row loaded as defaults.")
+            st.sidebar.success("✅ CSV uploaded successfully. Random row loaded as default values.")
         else:
-            st.sidebar.error("❌ Uploaded CSV does not contain all required feature columns.")
+            st.sidebar.error("❌ CSV missing required feature columns.")
     except Exception as e:
-        st.sidebar.error(f"Error reading file: {e}")
+        st.sidebar.error(f"Error reading CSV: {e}")
 
 # --------------------------
-# Input fields
+# Input fields for prediction
 # --------------------------
-st.header("🔢 Enter or adjust the following features")
-
+st.header("🔢 Enter or adjust features for prediction")
 cols = st.columns(3)
 inputs = []
 
 for i, feature in enumerate(feature_names):
+    # Set default value to random row value if available
+    default_value = float(default_values[i]) if default_values is not None else 0.0
     with cols[i % 3]:
-        default_value = float(default_values[i]) if default_values is not None else 0.0
-        value = st.number_input(f"{feature.replace('_', ' ').title()}", value=default_value, format="%.5f")
+        value = st.number_input(f"{feature.replace('_', ' ').title()}", value=default_value, format="%.5f", key=f"input_{i}")
         inputs.append(value)
 
 # --------------------------
@@ -81,11 +81,10 @@ if st.button("🔍 Predict"):
         prediction = model.predict(input_data)[0]
 
         # If model supports predict_proba, show confidence
+        confidence = None
         if hasattr(model, "predict_proba"):
             prob = model.predict_proba(input_data)[0]
             confidence = np.max(prob) * 100
-        else:
-            confidence = None
 
         result = "Malignant" if prediction == 1 else "Benign"
 
