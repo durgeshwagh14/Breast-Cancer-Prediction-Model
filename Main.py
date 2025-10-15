@@ -20,6 +20,7 @@ st.title("🎗️ Breast Cancer Prediction App")
 st.markdown("""
 This app predicts whether a breast tumor is **Benign** or **Malignant** 
 based on features from a digitized image of a fine needle aspirate (FNA) of a breast mass.
+It also displays your input data and visualizes it for analysis.
 """)
 
 # --------------------------
@@ -59,7 +60,6 @@ if uploaded_file is not None:
         st.sidebar.error(f"Error reading CSV: {e}. Random values will be used instead.")
         default_values = np.random.uniform(0.5, 15.0, size=len(feature_names))
 else:
-    # Generate random values if no CSV uploaded
     default_values = np.random.uniform(0.5, 15.0, size=len(feature_names))
 
 # --------------------------
@@ -72,7 +72,12 @@ inputs = []
 for i, feature in enumerate(feature_names):
     default_value = float(default_values[i])
     with cols[i % 3]:
-        value = st.number_input(f"{feature.replace('_', ' ').title()}", value=default_value, format="%.5f", key=f"input_{i}")
+        value = st.number_input(
+            f"{feature.replace('_', ' ').title()}",
+            value=default_value,
+            format="%.5f",
+            key=f"input_{i}"
+        )
         inputs.append(value)
 
 # --------------------------
@@ -83,7 +88,7 @@ if st.button("🔍 Predict"):
         input_data = np.array(inputs).reshape(1, -1)
         prediction = model.predict(input_data)[0]
 
-        # Show confidence if supported
+        # If model supports predict_proba, show confidence
         confidence = None
         if hasattr(model, "predict_proba"):
             prob = model.predict_proba(input_data)[0]
@@ -96,6 +101,19 @@ if st.button("🔍 Predict"):
 
         if confidence:
             st.info(f"Model confidence: **{confidence:.2f}%**")
+
+        # --------------------------
+        # Display user input data
+        # --------------------------
+        st.subheader("📊 Input Data Table")
+        input_df = pd.DataFrame([inputs], columns=feature_names)
+        st.dataframe(input_df.T.rename(columns={0: "Value"}))
+
+        # --------------------------
+        # Graph-wise analysis
+        # --------------------------
+        st.subheader("📈 Feature Analysis")
+        st.bar_chart(input_df.T.rename(columns={0: "Value"}))
 
     except Exception as e:
         st.error(f"An error occurred during prediction: {e}")
