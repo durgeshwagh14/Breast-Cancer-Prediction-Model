@@ -5,7 +5,7 @@ import pickle
 import random
 
 # --------------------------
-# Load trained model
+# Load the trained model
 # --------------------------
 model_path = "best_model.pkl"
 with open(model_path, "rb") as file:
@@ -15,6 +15,7 @@ with open(model_path, "rb") as file:
 # Streamlit UI
 # --------------------------
 st.set_page_config(page_title="Breast Cancer Prediction", page_icon="🎗️", layout="wide")
+
 st.title("🎗️ Breast Cancer Prediction App")
 st.markdown("""
 This app predicts whether a breast tumor is **Benign** or **Malignant** 
@@ -37,10 +38,29 @@ feature_names = [
 ]
 
 # --------------------------
-# Generate random default values dynamically
+# CSV Upload Section
 # --------------------------
-# Optional: you can define realistic ranges for each feature
-default_values = [round(random.uniform(0.5, 30.0), 3) for _ in feature_names]
+st.sidebar.header("📂 Upload CSV Data (Optional)")
+uploaded_file = st.sidebar.file_uploader("Upload a CSV file containing feature data", type=["csv"])
+
+default_values = []
+
+if uploaded_file is not None:
+    try:
+        data = pd.read_csv(uploaded_file)
+        if all(col in data.columns for col in feature_names):
+            random_row = data.sample(1, random_state=random.randint(0, 9999))
+            default_values = random_row[feature_names].iloc[0].values
+            st.sidebar.success("✅ CSV uploaded successfully. Random row loaded as default values.")
+        else:
+            st.sidebar.error("❌ CSV missing required feature columns. Random values will be used instead.")
+            default_values = np.random.uniform(0.5, 15.0, size=len(feature_names))
+    except Exception as e:
+        st.sidebar.error(f"Error reading CSV: {e}. Random values will be used instead.")
+        default_values = np.random.uniform(0.5, 15.0, size=len(feature_names))
+else:
+    # Generate random values if no CSV uploaded
+    default_values = np.random.uniform(0.5, 15.0, size=len(feature_names))
 
 # --------------------------
 # Input fields for prediction
@@ -50,13 +70,9 @@ cols = st.columns(3)
 inputs = []
 
 for i, feature in enumerate(feature_names):
+    default_value = float(default_values[i])
     with cols[i % 3]:
-        value = st.number_input(
-            f"{feature.replace('_', ' ').title()}",
-            value=float(default_values[i]),
-            format="%.5f",
-            key=f"input_{i}"
-        )
+        value = st.number_input(f"{feature.replace('_', ' ').title()}", value=default_value, format="%.5f", key=f"input_{i}")
         inputs.append(value)
 
 # --------------------------
@@ -67,6 +83,7 @@ if st.button("🔍 Predict"):
         input_data = np.array(inputs).reshape(1, -1)
         prediction = model.predict(input_data)[0]
 
+        # Show confidence if supported
         confidence = None
         if hasattr(model, "predict_proba"):
             prob = model.predict_proba(input_data)[0]
@@ -79,19 +96,6 @@ if st.button("🔍 Predict"):
 
         if confidence:
             st.info(f"Model confidence: **{confidence:.2f}%**")
-
-        # --------------------------
-        # Display user input data
-        # --------------------------
-        st.subheader("📊 Input Data Table")
-        input_df = pd.DataFrame([inputs], columns=feature_names)
-        st.dataframe(input_df.T.rename(columns={0: "Value"}))
-
-        # --------------------------
-        # Graph-wise analysis
-        # --------------------------
-        st.subheader("📈 Feature Analysis")
-        st.bar_chart(input_df.T.rename(columns={0: "Value"}))
 
     except Exception as e:
         st.error(f"An error occurred during prediction: {e}")
